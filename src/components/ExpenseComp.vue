@@ -42,7 +42,7 @@
           <div v-if="method.value === 'OTHERS'">
             <label class="block text-sm font-medium mb-1" for="otherMethod">Specify Other Method</label>
             <input id="otherMethod" v-model="otherMethod.value" :ref="otherMethod.ref" type="text" class="w-full border rounded px-2 py-1" />
-            <p v-if="otherMethod.error && !hideErrors" class="text-sm text-red-600">{{ otherMethod.error.message }}</p>
+            <p v-if="otherMethod.error && !hideErrors" class="text-sm text-red-600">{{ otherMethod.error[0]?.message }}</p>
             <p v-if="otherMethodError" class="text-sm text-red-600">{{ otherMethodError }}</p>
           </div>
 
@@ -89,7 +89,7 @@ interface Expense extends FormValues { }
 
 const expenses = ref<Expense[]>([])
 
-const { useField, handleSubmit, set, errors, validateField, get } = useForm<FormValues>({ validateMode: 'submit',
+const { useField, handleSubmit, set, errors, validateField, get } = useForm({ validateMode: 'submit',
   defaultValues: {
     name: '',
     maker: '',
@@ -102,14 +102,14 @@ const { useField, handleSubmit, set, errors, validateField, get } = useForm<Form
   }
 })
 
-const name = useField<string>('name')
-const maker = useField<string>('maker')
-const amount = useField<number>('amount')
-const method = useField<PaymentMethod>('method')
-const otherMethod = useField<string>('otherMethod')
-const hasInvoice = useField<boolean>('hasInvoice')
-const invoice = useField<File | null>('invoice')
-const invoiceName = useField<string>('invoiceName')
+const name = useField('name')
+const maker = useField('maker')
+const amount = useField('amount')
+const method = useField('method')
+const otherMethod = useField('otherMethod')
+const hasInvoice = useField('hasInvoice')
+const invoice = useField('invoice')
+const invoiceName = useField('invoiceName')
 const invoiceInput = ref<HTMLInputElement | null>(null)
 const formKey = ref(0)  // used to force remount of the form to clear internal validation/UI state
 const hideErrors = ref(false) // temporary flag to suppress validation messages immediately after submit/reset
@@ -149,121 +149,6 @@ watch(() => hasInvoice.value, (val) => {
   }
 })
 
-const onSubmit = handleSubmit(async (data: FormValues) => {
-  try {
-    console.log('onSubmit called with data:', JSON.parse(JSON.stringify(data)))
-    // clear errors
-    otherMethodError.value = null
-    invoiceError.value = null
-    nameError.value = null
-    makerError.value = null
-    amountError.value = null
-
-    // manual validation (avoid using library rules which were causing persistent messages)
-    if (!data.name || String(data.name).trim() === '') {
-      nameError.value = 'Expense name is required.'
-    }
-    if (!data.maker || String(data.maker).trim() === '') {
-      makerError.value = 'Expense maker is required.'
-    }
-    const parsedAmt = typeof data.amount === 'string' ? parseFloat(String(data.amount)) : data.amount
-    console.log('parsedAmt:', parsedAmt, 'typeof:', typeof parsedAmt)
-    if (isNaN(Number(parsedAmt))) {
-      amountError.value = 'Amount must be a number.'
-    }
-    if (nameError.value || makerError.value || amountError.value) {
-      console.log('manual validation failed', { nameError: nameError.value, makerError: makerError.value, amountError: amountError.value })
-      return
-    }
-
-    // conditional required validation for 'OTHERS'
-    if (data.method === 'OTHERS' && (!data.otherMethod || data.otherMethod.trim() === '')) {
-      otherMethodError.value = 'Other payment method is required.'
-      console.log('other method validation failed')
-      return
-    }
-
-    // invoice file required only if checkbox is checked
-    if (data.hasInvoice && !invoice.value) {
-      invoiceError.value = 'Invoice file is required when Invoice is checked.'
-      console.log('invoice required validation failed')
-      return
-    }
-  } catch (err) {
-    console.error('onSubmit unexpected error', err)
-    return
-  }
-
-  const amt = typeof data.amount === 'string' ? parseFloat(String(data.amount)) : data.amount
-  const methodLabel = data.method === 'OTHERS' && data.otherMethod ? data.otherMethod : data.method
-
-  const newExpense: Expense & { methodLabel?: string } = {
-    name: data.name,
-    maker: data.maker,
-    amount: amt,
-    method: data.method,
-    otherMethod: data.otherMethod,
-    invoice: invoice.value,
-    invoiceName: invoiceName.value
-  }
-  ;(newExpense as any).methodLabel = methodLabel
-
-  expenses.value.push(newExpense)
-  console.log('expenses after push (onSubmit):', expenses.value.length, JSON.parse(JSON.stringify(expenses.value.map(e => ({ name: e.name, amount: e.amount })))) )
-
-  // prevent watchers from re-enabling errors while we programmatically clear fields
-  suppressWatch.value = true
-
-  // reset to defaults
-  set({ name: '', maker: '', amount: 0, method: 'UPI', otherMethod: '', hasInvoice: false, invoice: null, invoiceName: '' })
-
-  // also explicitly set individual field values to ensure v-model updates immediately
-  name.value = ''
-  maker.value = ''
-  amount.value = 0
-  method.value = 'UPI'
-  otherMethod.value = ''
-  hasInvoice.value = false
-  invoice.value = null
-  invoiceName.value = ''
-
-  // clear any file input DOM value and local errors
-  if (invoiceInput.value) invoiceInput.value.value = ''
-  otherMethodError.value = null
-  invoiceError.value = null
-
-  // give watchers a tick to run (they might re-validate) then remove errors and remount
-  await nextTick()
-  clearFormErrors()
-  clearFieldErrors()
-
-  // re-enable watchers and suppress showing errors until user edits
-  suppressWatch.value = false
-  hideErrors.value = true
-
-  // remount form so any remaining internal validation/UI state is cleared
-  formKey.value += 1
-
-  // delayed cleanup: some internal watchers may re-validate and re-add errors after remount;
-  // remove those keys on the next macrotask and log the final errors for debugging
-  setTimeout(() => {
-    try { console.log('form errors after submit (delayed):', JSON.parse(JSON.stringify(errors))) } catch (e) { console.log('form errors after submit (delayed):', errors) }
-    // log amount value/type
-    try { console.log('amount value (get):', get('amount'), 'typeof:', typeof get('amount')) } catch (e) { console.log('get("amount") not available') }
-
-    // attempt to re-validate amount and then remove any error it creates
-    try {
-      validateField('amount')
-        .then(() => { if ((errors as any).amount) delete (errors as any).amount })
-        .catch((err: any) => { console.log('validateField(amount) error:', err); delete (errors as any).amount })
-    } catch (err) {
-      console.log('validateField not available', err)
-      delete (errors as any).amount
-    }
-
-    ;['name', 'maker', 'amount', 'otherMethod'].forEach((k) => { delete (errors as any)[k] })
-  }, 0)
-})
 
 // Plain submit handler that bypasses the library's validateFields (which may contain stale rules)
 async function submitPlain(e: Event) {
@@ -315,6 +200,7 @@ async function submitPlain(e: Event) {
       amount: amt,
       method: data.method,
       otherMethod: data.otherMethod,
+      hasInvoice: hasInvoice.value,
       invoice: invoice.value,
       invoiceName: invoiceName.value
     }
@@ -324,7 +210,14 @@ async function submitPlain(e: Event) {
 
     // reuse existing reset logic
     suppressWatch.value = true
-    set({ name: '', maker: '', amount: 0, method: 'UPI', otherMethod: '', hasInvoice: false, invoice: null, invoiceName: '' })
+    set('name', '')
+    set('maker', '')
+    set('amount', 0)
+    set('method', 'UPI')
+    set('otherMethod', '')
+    set('hasInvoice', false)
+    set('invoice', null)
+    set('invoiceName', '')
     name.value = ''
     maker.value = ''
     amount.value = 0
@@ -364,7 +257,14 @@ async function resetForm() {
   suppressWatch.value = true
 
   // reset defaults
-  set({ name: '', maker: '', amount: 0, method: 'UPI', otherMethod: '', hasInvoice: false, invoice: null, invoiceName: '' })
+  set('name', '')
+  set('maker', '')
+  set('amount', 0)
+  set('method', 'UPI')
+  set('otherMethod', '')
+  set('hasInvoice', false)
+  set('invoice', null)
+  set('invoiceName', '')
 
   // explicitly update bound fields so UI reflects the reset immediately
   name.value = ''

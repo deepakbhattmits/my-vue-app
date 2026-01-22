@@ -80,6 +80,7 @@ interface Expense {
   hasInvoice: boolean
   invoice: File | null
   invoiceName?: string
+  date?: string | Date
 }
 
 const props = defineProps<{ expenses: Expense[] }>()
@@ -205,7 +206,8 @@ const groupedExpenses = computed(() => {
   const map = new Map<string, Expense[]>()
   const arr = props.expenses || []
   for (const e of arr) {
-    const key = e.date ? (new Date(e.date)).toISOString().slice(0, 10) : (new Date()).toISOString().slice(0, 10)
+    const eDate = (e as any).date
+    const key = eDate ? (new Date(eDate)).toISOString().slice(0, 10) : (new Date()).toISOString().slice(0, 10)
     if (!map.has(key)) map.set(key, [])
     map.get(key)!.push(e)
   }

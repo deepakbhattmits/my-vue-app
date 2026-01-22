@@ -6,19 +6,19 @@
         <form :key="formKey" @submit.prevent="submitPlain" class="space-y-3">
           <div>
             <label class="block text-sm font-medium mb-1" for="expenseName">Expense Name</label>
-            <input id="expenseName" v-model="name.value" :ref="name.ref" type="text" required class="w-full border rounded px-2 py-1" />
+            <input id="expenseName" v-model="name.value" :ref="name.ref" type="text"  class="w-full border rounded px-2 py-1" />
             <p v-if="nameError && !hideErrors" class="text-sm text-red-600">{{ nameError }}</p>
           </div>
 
           <div>
             <label class="block text-sm font-medium mb-1" for="expenseMaker">Expense Maker</label>
-            <input id="expenseMaker" v-model="maker.value" :ref="maker.ref" type="text" required class="w-full border rounded px-2 py-1" />
+            <input id="expenseMaker" v-model="maker.value" :ref="maker.ref" type="text"  class="w-full border rounded px-2 py-1" />
             <p v-if="makerError && !hideErrors" class="text-sm text-red-600">{{ makerError }}</p>
           </div>
 
           <div>
             <label class="block text-sm font-medium mb-1" for="expenseAmount">Amount</label>
-            <input id="expenseAmount" v-model.number="amount.value" :ref="amount.ref" type="number" min="0" step="0.01" required class="w-full border rounded px-2 py-1" />
+            <input id="expenseAmount" v-model.number="amount.value" :ref="amount.ref" type="number" min="0" step="0.01" class="w-full border rounded px-2 py-1" />
             <p v-if="amountError && !hideErrors" class="text-sm text-red-600">{{ amountError }}</p>
           </div>
 

@@ -45,8 +45,8 @@
                   <td class="px-3 py-2 first-letter:uppercase">{{ exp.name }}</td>
                   <td class="px-3 py-2">₹{{ exp.amount }}</td>
                   <td v-if="hasInvoiceColumn" class="px-3 py-2">
-                    <template v-if="exp.invoice">
-                      <img v-if="isImage(exp) && invoiceUrlMap.has(exp.invoice)" :src="invoiceUrlMap.get(exp.invoice)" alt="invoice" class="inline-block h-8 w-8 object-cover rounded" />
+                    <template v-if="getInvoice(exp)">
+                      <img v-if="isImage(exp) && invoiceUrlMap.has(getInvoice(exp))" :src="invoiceUrlMap.get(getInvoice(exp))" alt="invoice" class="inline-block h-8 w-8 object-cover rounded" />
                       <a href="#" @click.prevent="openInvoice(exp)" class="text-sm text-blue-600 ml-2">{{ exp.invoiceName || 'View' }}</a>
                     </template>
                     <template v-else>
@@ -68,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineProps, defineEmits, ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 
 interface Expense {
   name: string
@@ -77,6 +77,8 @@ interface Expense {
   method: string
   methodLabel?: string
   otherMethod?: string
+  hasInvoice: boolean
+  invoice: File | null
   invoiceName?: string
 }
 
@@ -136,20 +138,25 @@ watch(() => props.expenses, (v) => {
 
 // whether we should render the Invoice column (if any expense has invoice or invoiceName)
 const hasInvoiceColumn = computed(() => {
-  return (props.expenses || []).some((e) => !!e.invoice || !!e.invoiceName)
+  return (props.expenses || []).some((e) => !!(e as any).invoice || !!e.invoiceName)
 })
 const colCount = computed(() => hasInvoiceColumn.value ? 7 : 6)
 
 // cache object URLs for invoice File objects to show thumbnails and open them
 const invoiceUrlMap = ref<Map<any, string>>(new Map())
 
+function getInvoice(exp: Expense) {
+  return (exp as any).invoice
+}
+
 function isImage(exp: Expense) {
-  return !!exp.invoice && typeof (exp.invoice as any).type === 'string' && (exp.invoice as any).type.startsWith('image/')
+  const invoice = (exp as any).invoice
+  return !!invoice && typeof invoice.type === 'string' && invoice.type.startsWith('image/')
 }
 
 function openInvoice(exp: Expense) {
   try {
-    const f = exp.invoice as any
+    const f = (exp as any).invoice as any
     if (f && invoiceUrlMap.value.has(f)) {
       const url = invoiceUrlMap.value.get(f)!
       window.open(url)
@@ -169,7 +176,7 @@ function openInvoice(exp: Expense) {
 watch(() => props.expenses, (arr) => {
   const files = new Set<any>()
   for (const e of (arr || [])) {
-    if (e && e.invoice) files.add(e.invoice)
+    if (e && (e as any).invoice) files.add((e as any).invoice)
   }
   // add new
   for (const f of files) {
@@ -228,7 +235,6 @@ function toggleAll(e: Event) {
 // update header checkbox indeterminate state when selection changes
 watch([selectedCount, () => props.expenses.length], () => {
   if (!headerCheckbox.value) return
-  const len = props.expenses ? props.expenses.length : 0
   headerCheckbox.value.indeterminate = (selectedCount.value > 0 && !isAllSelected.value)
 })
 
@@ -252,18 +258,6 @@ function toggle(idx: number) {
   else s.add(idx)
   // reassign to trigger reactivity
   selectedIndices.value = s
-}
-
-function emitRemove(idx: number) {
-  // rebuild selection set to account for removed index (shift indices > idx)
-  const newSet = new Set<number>()
-  for (const i of selectedIndices.value) {
-    if (i === idx) continue
-    if (i > idx) newSet.add(i - 1)
-    else newSet.add(i)
-  }
-  selectedIndices.value = newSet
-  emit('remove', idx)
 }
 </script>
 

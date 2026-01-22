@@ -89,7 +89,7 @@ interface Expense extends FormValues { }
 
 const expenses = ref<Expense[]>([])
 
-const { useField, handleSubmit, set, errors, validateField, get } = useForm({ validateMode: 'submit',
+const { useField, set, errors } = useForm({ validateMode: 'submit',
   defaultValues: {
     name: '',
     maker: '',
